@@ -1,0 +1,105 @@
+CLASS zcl_check_itm_cat_mrp_grp DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC .
+
+  PUBLIC SECTION.
+    "! <p class="shorttext synchronized" lang="en">Check MRP GRP equal to Item Category</p>
+    "!
+    "! @parameter EVAL_CONTEXt | <p class="shorttext synchronized" lang="en">Evaluation Context</p>
+    "! @parameter boolean | <p class="shorttext synchronized" lang="en">Rule Ok or not Ok</p>
+    CLASS-METHODS check_itm_cat_mrp_grp IMPORTING eval_context TYPE eval_context_dq_str
+                                                  mvke_dq_str  TYPE mvke_dq_str OPTIONAL
+                                        EXPORTING boolean      TYPE boolean.
+
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+    CLASS-METHODS get_plant_mrp_grp
+      IMPORTING
+        io_conv_api     TYPE REF TO if_usmd_conv_som_gov_api
+        mvke_dq_str     TYPE  mvke_dq_str
+      RETURNING
+        VALUE(r_result) TYPE disgr.
+ENDCLASS.
+
+
+
+CLASS zcl_check_itm_cat_mrp_grp IMPLEMENTATION.
+  METHOD check_itm_cat_mrp_grp.
+    boolean = abap_false. "Default boolean to ABAP False in case of unexpected exceptions
+    CHECK eval_context-changerequest_id IS NOT INITIAL.
+** The method is called in the context of Change Request. Therefore Convenient API instance is always available.
+    CHECK cl_usmd_conv_som_gov_api=>check_instance_exists( iv_model_name = 'MM' ) EQ abap_true.
+    TRY.
+** Get Instance of Convenient API
+        DATA(lo_conv_api) = cl_usmd_conv_som_gov_api=>get_instance( iv_model_name = 'MM' ).
+        CHECK lo_conv_api->mv_crequest_id = eval_context-changerequest_id.
+*** Step 1 If Delivery Plant is initial set boolean eq abap_false and skip method processing.
+        IF mvke_dq_str-dwerk IS INITIAL.
+          boolean = abap_false.
+        ELSE.
+** Step 2 Check if Item category is equal to MRP group defined for delivery plant
+          IF mvke_dq_str-mtpos = get_plant_mrp_grp( EXPORTING io_conv_api = lo_conv_api  mvke_dq_str =  mvke_dq_str  ).
+            boolean = abap_true.
+          ELSE.
+            boolean = abap_false.
+          ENDIF.
+        ENDIF.
+      CATCH cx_usmd_conv_som_gov_api.
+      CATCH cx_usmd_app_context_cons_error.
+      CATCH cx_usmd_gov_api.
+    ENDTRY.
+  ENDMETHOD.
+
+
+  METHOD get_plant_mrp_grp.
+    FIELD-SYMBOLS : <lt_marc> TYPE ANY TABLE.
+    FIELD-SYMBOLS : <lt_marc_act> TYPE ANY TABLE.
+    DATA lo_data TYPE REF TO data.
+** Step1 Create Data instance of Entity MARCMRPPP
+    TRY.
+
+        io_conv_api->get_entity_structure(
+          EXPORTING
+            iv_entity_name = 'MARCMRPPP'
+            iv_struct_type = cl_usmd_conv_som_gov_api=>gc_struct_key_attr
+          IMPORTING
+            er_structure   = DATA(lr_structure)
+            er_table       = DATA(lr_table)
+        ).
+        ASSIGN lr_structure->* TO FIELD-SYMBOL(<ls_marc>).
+        ASSIGN lr_table->* TO <lt_marc>.
+        CREATE DATA lo_data LIKE <lt_marc>.
+        ASSIGN lo_data->* TO <lt_marc_act>.
+        CHECK <lt_marc> IS ASSIGNED AND <ls_marc> IS ASSIGNED AND <lt_marc_act> IS ASSIGNED.
+        io_conv_api->query_entity_data(
+          EXPORTING
+            iv_entity_name         = 'MARCMRPPP'
+            it_selection_condition = VALUE #( ( fieldname = 'MATERIAL' option = 'EQ' sign = 'I' low = CONV matnr( mvke_dq_str-source_id ) )
+                                              ( fieldname = 'WERKS'    option = 'EQ' sign = 'I' low = CONV werks_d( mvke_dq_str-dwerk ) )
+                                            )
+          IMPORTING
+            et_inactive_data       = <lt_marc>
+            et_active_data         = <lt_marc_act>
+
+        ).
+        CHECK <lt_marc> IS NOT INITIAL OR <lt_marc_act> IS NOT INITIAL.
+        LOOP AT <lt_marc> ASSIGNING <ls_marc>.
+          ASSIGN COMPONENT 'DGRMRPPP' OF STRUCTURE <ls_marc> TO FIELD-SYMBOL(<lv_mrp_grp>).
+          CHECK sy-subrc IS INITIAL.
+          r_result = <lv_mrp_grp>.
+        ENDLOOP.
+        IF sy-subrc IS NOT INITIAL.
+          LOOP AT <lt_marc_act> ASSIGNING <ls_marc>.
+            ASSIGN COMPONENT 'DGRMRPPP' OF STRUCTURE <ls_marc> TO <lv_mrp_grp>.
+            CHECK sy-subrc IS INITIAL.
+            r_result = <lv_mrp_grp>.
+          ENDLOOP.
+        ENDIF.
+
+      CATCH BEFORE UNWIND cx_usmd_gov_api_core_error.
+      CATCH cx_usmd_gov_api.
+    ENDTRY.
+  ENDMETHOD.
+
+ENDCLASS.
