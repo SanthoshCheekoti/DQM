@@ -14,6 +14,11 @@ CLASS zcl_check_itm_cat_mrp_grp DEFINITION
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+    "! <p class="shorttext synchronized" lang="en">Get MRP group of Delivery Plant</p>
+    "!
+    "! @parameter io_conv_api | <p class="shorttext synchronized" lang="en">Convenient API</p>
+    "! @parameter mvke_dq_str | <p class="shorttext synchronized" lang="en">Current Sales Area from BRF+ context</p>
+    "! @parameter r_result | <p class="shorttext synchronized" lang="en">MRP Group of Delivery Plant</p>
     CLASS-METHODS get_plant_mrp_grp
       IMPORTING
         io_conv_api     TYPE REF TO if_usmd_conv_som_gov_api
