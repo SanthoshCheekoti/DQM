@@ -39,11 +39,7 @@ CLASS zcl_check_itm_cat_mrp_grp IMPLEMENTATION.
           boolean = abap_false.
         ELSE.
 ** Step 2 Check if Item category is equal to MRP group defined for delivery plant
-          IF mvke_dq_str-mtpos = get_plant_mrp_grp( EXPORTING io_conv_api = lo_conv_api  mvke_dq_str =  mvke_dq_str  ).
-            boolean = abap_true.
-          ELSE.
-            boolean = abap_false.
-          ENDIF.
+          boolean = cond #( when mvke_dq_str-mtpos = get_plant_mrp_grp( EXPORTING io_conv_api = lo_conv_api  mvke_dq_str =  mvke_dq_str  ) then abap_true else abap_false ).
         ENDIF.
       CATCH cx_usmd_conv_som_gov_api.
       CATCH cx_usmd_app_context_cons_error.
