@@ -27,20 +27,17 @@ ENDCLASS.
 CLASS zcl_check_itm_cat_mrp_grp IMPLEMENTATION.
   METHOD check_itm_cat_mrp_grp.
     boolean = abap_false. "Default boolean to ABAP False in case of unexpected exceptions
-    CHECK eval_context-changerequest_id IS NOT INITIAL.
 ** The method is called in the context of Change Request. Therefore Convenient API instance is always available.
-    CHECK cl_usmd_conv_som_gov_api=>check_instance_exists( iv_model_name = 'MM' ) EQ abap_true.
+    CHECK eval_context-changerequest_id IS NOT INITIAL AND cl_usmd_conv_som_gov_api=>check_instance_exists( iv_model_name = 'MM' ) EQ abap_true.
     TRY.
-** Get Instance of Convenient API
-        DATA(lo_conv_api) = cl_usmd_conv_som_gov_api=>get_instance( iv_model_name = 'MM' ).
-        CHECK lo_conv_api->mv_crequest_id = eval_context-changerequest_id.
-*** Step 1 If Delivery Plant is initial set boolean eq abap_false and skip method processing.
-        IF mvke_dq_str-dwerk IS INITIAL.
-          boolean = abap_false.
-        ELSE.
-** Step 2 Check if Item category is equal to MRP group defined for delivery plant
-          boolean = cond #( when mvke_dq_str-mtpos = get_plant_mrp_grp( EXPORTING io_conv_api = lo_conv_api  mvke_dq_str =  mvke_dq_str  ) then abap_true else abap_false ).
-        ENDIF.
+** Safety Check - Check if CR ID of BRF+ context is same as CR ID of Convenient API
+        CHECK cl_usmd_conv_som_gov_api=>get_instance( iv_model_name = 'MM' )->mv_crequest_id = eval_context-changerequest_id.
+**  Step 1 If Delivery Plant is initial set boolean eq abap_false and skip method processing.
+**  Step 2 if Item category of current sales area is equal to MRP group defined for delivery plant then abap_true else abap_false
+        boolean = COND #( WHEN mvke_dq_str-dwerk IS INITIAL THEN abap_false
+                          ELSE COND #( WHEN mvke_dq_str-mtpos = get_plant_mrp_grp( EXPORTING io_conv_api = cl_usmd_conv_som_gov_api=>get_instance( iv_model_name = 'MM' )
+                                                                                        mvke_dq_str =  mvke_dq_str  ) THEN abap_true
+                                       ELSE abap_false ) ).
       CATCH cx_usmd_conv_som_gov_api.
       CATCH cx_usmd_app_context_cons_error.
       CATCH cx_usmd_gov_api.
